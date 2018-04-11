@@ -77,8 +77,9 @@ def main():
             logger.debug('track: "{}" ({}) {:.0f}m'.format(l['name'], l['path'], l['length']))
         tracks += 1
 
-    logger.info('Found and parsed data of %d cars and %d tracks', cars, tracks)
-
+    logger.info('Found and parsed data of %d cars and %d tracks.', cars, tracks)
+    logger.info('We\'re done here. Press Enter to or close this window.')
+    input()
     return 0
 
 
