@@ -6,6 +6,33 @@ from os import path
 logger = logging.getLogger('main')
 
 
+def fix_track_length(orig_length):
+    # tl = track length. here we remove spaces from the input
+    tl = orig_length.replace(' ', '')
+
+    # if we got km, make sure the separator is a dot and multiply by 1000
+    if tl.endswith('km'):
+        tl = tl.replace(',', '.')
+        tl = float(tl[:-2])*1000
+
+    # if we got m, remove the thousands separator. (it's unlikely a track is described as e.g. 1400.3m long)
+    elif tl.endswith('m'):
+        tl = tl.replace(',', '').replace('.', '')
+        tl = float(tl[:-1])
+
+    # if we don't have a unit, just convert it to float
+    else:
+        # float() needs a dot separator, not a comma
+        tl = tl.replace(',', '.')
+        tl = float(tl)
+
+    # if the track length is really short, we're probably dealing with km. so let's multiply by 1000
+    if tl <= 100:
+        tl *= 1000
+
+    return tl
+
+
 def get_ac_install_dir():
     kname = ['HKEY_CURRENT_USER/Software/Valve/Steam/SteamPath',
              'HKEY_LOCAL_MACHINE/Software/Wow6432Node/Microsoft/Windows/CurrentVersion/Uninstall/Steam App 244210',
