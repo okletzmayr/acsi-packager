@@ -80,6 +80,7 @@ def get_ac_install_dir():
     if ac_dir is not None:
         return ac_dir
     else:
+        # TODO: handle this exception in main()!
         raise RuntimeError('AC Installation not found!')
 
 

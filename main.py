@@ -5,20 +5,25 @@ from os import listdir, path
 
 import utils
 
-logging.basicConfig(stream=sys.stdout, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger('main')
+logFormatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+consoleHandler = logging.StreamHandler()
+consoleHandler.setFormatter(logFormatter)
+logger = logging.getLogger()
+logger.addHandler(consoleHandler)
+logger.setLevel(logging.INFO)
 
 parser = argparse.ArgumentParser()
-parser.add_argument('installdir', nargs='?', help='Assetto Corsa installation directory')
-parser.add_argument('--debug', help='print debug output', action='store_true')
-
+parser.add_argument('installdir', help='Assetto Corsa directory', nargs='?')
+parser.add_argument('--debug', help='log debug output', action='store_true')
 args = parser.parse_args()
-
-if args.debug:
-    logger.setLevel(logging.DEBUG)
 
 
 def main():
+    if args.debug:
+        fileHandler = logging.FileHandler('acsi-packager.log', mode='w')
+        logger.addHandler(fileHandler)
+        logger.setLevel(logging.DEBUG)
+
     if args.installdir:
         ac_install_dir = args.installdir
         # check the installdir if the user supplied the path
@@ -78,8 +83,9 @@ def main():
         tracks += 1
 
     logger.info('Found and parsed data of %d cars and %d tracks.', cars, tracks)
-    logger.info('We\'re done here. Press Enter to or close this window.')
+    print('We\'re done here. Press Enter or close this window.')
     input()
+
     return 0
 
 
