@@ -3,6 +3,8 @@ import logging
 import winreg
 from os import listdir, path
 
+import vdf
+
 logger = logging.getLogger('main')
 
 
@@ -13,7 +15,7 @@ def fix_track_length(orig_length):
     # if we got km, make sure the separator is a dot and multiply by 1000
     if tl.endswith('km'):
         tl = tl.replace(',', '.')
-        tl = float(tl[:-2])*1000
+        tl = float(tl[:-2]) * 1000
 
     # if we got m, remove the thousands separator. (it's unlikely a track is described as e.g. 1400.3m long)
     elif tl.endswith('m'):
@@ -33,55 +35,48 @@ def fix_track_length(orig_length):
     return tl
 
 
-def get_ac_install_dir():
-    kname = ['HKEY_CURRENT_USER/Software/Valve/Steam/SteamPath',
-             'HKEY_LOCAL_MACHINE/Software/Wow6432Node/Microsoft/Windows/CurrentVersion/Uninstall/Steam App 244210',
-             'HKEY_LOCAL_MACHINE/Software/Microsoft/Windows/CurrentVersion/Uninstall/Steam App 244210']
-    ac_dir = None
+def get_steamapps_dir():
+    path64 = r"SOFTWARE\WOW6432Node\Valve\Steam"
+    path32 = r"SOFTWARE\Valve\Steam"
 
     try:
-        k = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r'Software\Valve\Steam')
-        v = winreg.QueryValueEx(k, 'SteamPath')
-        res = path.join(v[0], 'SteamApps', 'common', 'assettocorsa')
-        if path.isdir(res) and path.isfile(path.join(res, 'AssettoCorsa.exe')):
-            logger.debug('Found using %s', kname[0])
-            ac_dir = res
+        try:
+            key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, path64)
+        except:
+            key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, path32)
+
+        steamapps = path.join(winreg.QueryValueEx(key, 'InstallPath')[0], "steamapps")
+        if path.isdir(steamapps):
+            return steamapps
         else:
-            logger.error('Not found using %s', kname[0])
-    except Exception as e:
-        logger.error('Could not query %s: %s', kname[0], str(e))
+            raise NotADirectoryError('Steam installation registry entry found, but steamapps is empty.')
+    except:
+        raise RuntimeError('Steam installation not found!')
 
-    if ac_dir is None:
+
+def get_install_dir():
+    # there's one steam library we know exists: the one we found in the registry.
+    steamapps = [get_steamapps_dir()]
+
+    # steam keeps track of multiple libraries via this file
+    fp = open(path.join(steamapps[0], "libraryfolders.vdf"))
+    librarydict = vdf.load(fp)
+
+    # and numbers the libraries from 1 to however many libraries the user has.
+    # here we assume that no sane person has more than 16 steam libraries.
+    for i in range(1, 16):
         try:
-            k = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
-                               r'SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Steam App 244210')
-            res = winreg.QueryValueEx(k, 'InstallLocation')[0]
-            if path.isdir(res) and path.isfile(path.join(res, 'AssettoCorsa.exe')):
-                logger.error('Found using %s', kname[1])
-                ac_dir = res
-            else:
-                logger.error('Not found using %s', kname[1])
-        except Exception as e:
-            logger.error('Could not query %s: %s', kname[1], str(e))
+            f = librarydict["LibraryFolders"][str(i)]
+            steamapps.append(path.join(f, "steamapps"))
+        except:
+            break
 
-    if ac_dir is None:
-        try:
-            k = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
-                               r'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Steam App 244210')
-            res = winreg.QueryValueEx(k, 'InstallLocation')[0]
-            if path.isdir(res) and path.isfile(path.join(res, 'AssettoCorsa.exe')):
-                logger.error('Found using %s', kname[2])
-                ac_dir = res
-            else:
-                logger.error('Not found using %s', kname[2])
-        except Exception as e:
-            logger.error('Could not query %s: %s', kname[2], str(e))
-
-    if ac_dir is not None:
-        return ac_dir
-    else:
-        # TODO: handle this exception in main()!
-        raise RuntimeError('AC Installation not found!')
+    # next we loop over every library, and check if there's an appmanifest for assetto corsa.
+    for library in steamapps:
+        if 'appmanifest_244210.acf' in listdir(library):
+            return path.join(library, 'common', 'assettocorsa')
+        else:
+            return None
 
 
 def read_ui_file(fp):
@@ -127,7 +122,7 @@ def scan_ui_files(ac_install_dir):
         if path.exists(fp):
             info = read_ui_file(fp)
             tl = fix_track_length(info['length'])
-            data['tracks'][track] = {'ui_name': info['name'], 'length':  tl}
+            data['tracks'][track] = {'ui_name': info['name'], 'length': tl}
             logger.debug('track: "%s" (%s) - %dm', info['name'], track, tl)
 
         # if there are more, we have to scan each layout

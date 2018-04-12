@@ -23,23 +23,25 @@ args = parser.parse_args()
 
 
 def main():
+    # more verbose and file output when --debug flag is set
     if args.debug:
         fileHandler = logging.FileHandler('acsi-packager.log', mode='w')
         fileHandler.setFormatter(logFormatter)
         logger.addHandler(fileHandler)
         logger.setLevel(logging.DEBUG)
 
-    # check the installdir if the user supplied the path
+    # set the installdir if the user supplied the path
     if args.installdir:
         ac_install_dir = args.installdir
-        if not path.isdir(ac_install_dir) or not path.isfile(path.join(ac_install_dir, 'AssettoCorsa.exe')):
-            sys.exit('Assetto Corsa installation not found!')
 
-    # else use attempt to find it via the get_ac_install_dir function
+    # else attempt to find it via the get_install_dir function
     else:
         logger.info('No installation directory specified - searching for the AC installation directory')
-        ac_install_dir = utils.get_ac_install_dir()
+        ac_install_dir = utils.get_install_dir()
         logger.info('Detected installation: %s', ac_install_dir)
+
+    if not path.isdir(ac_install_dir) or not path.isfile(path.join(ac_install_dir, 'AssettoCorsa.exe')):
+        sys.exit('Assetto Corsa installation not found!')
 
     # temporary dir to store the JSON data and car/track preview images
     tempdir = path.join(path.dirname(__file__), 'package')
@@ -62,9 +64,6 @@ def main():
 
     tar.close()
     shutil.rmtree(tempdir)
-
-    print('We\'re done here. Press Enter or close this window.')
-    input()
 
     return 0
 
