@@ -1,5 +1,5 @@
 import unittest
-from utils import fix_track_length
+from src.utils import fix_track_length
 
 
 class TestTrackLengthFix(unittest.TestCase):

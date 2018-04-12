@@ -1,3 +1,3 @@
 import PyInstaller.__main__ as PyInstaller
 
-PyInstaller.run(['main.spec', '-y'])
+PyInstaller.run(['acsi-packager.spec', '-y'])

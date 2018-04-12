@@ -7,7 +7,7 @@ import sys
 import tarfile
 from os import path
 
-import utils
+from src import utils
 
 logFormatter = logging.Formatter('%(levelname)-5s - %(message)s')
 consoleHandler = logging.StreamHandler()

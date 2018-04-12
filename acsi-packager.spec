@@ -2,7 +2,7 @@
 
 block_cipher = None
 
-a = Analysis(['main.py'],
+a = Analysis(['src/acsi-packager.py'],
              pathex=None,
              binaries=None,
              datas=None,
