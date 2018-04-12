@@ -1,6 +1,10 @@
 import argparse
+import json
 import logging
+import os
+import shutil
 import sys
+import tarfile
 from os import path
 
 import utils
@@ -25,9 +29,9 @@ def main():
         logger.addHandler(fileHandler)
         logger.setLevel(logging.DEBUG)
 
+    # check the installdir if the user supplied the path
     if args.installdir:
         ac_install_dir = args.installdir
-        # check the installdir if the user supplied the path
         if not path.isdir(ac_install_dir) or not path.isfile(path.join(ac_install_dir, 'AssettoCorsa.exe')):
             sys.exit('Assetto Corsa installation not found!')
 
@@ -37,7 +41,27 @@ def main():
         ac_install_dir = utils.get_ac_install_dir()
         logger.info('Detected installation: %s', ac_install_dir)
 
-    utils.scan_ui_files(ac_install_dir)
+    # temporary dir to store the JSON data and car/track preview images
+    tempdir = path.join(path.dirname(__file__), 'package')
+    if not path.isdir(tempdir):
+        os.mkdir(tempdir)
+
+    with open(path.join(tempdir, 'content.json'), 'w') as fp:
+        data = utils.scan_ui_files(ac_install_dir)
+        json.dump(data, fp)
+
+    # this is a mess, so I better write this comment right now:
+    # tarfile.add() needs the arcname parameter if we don't want the full path structure in the tarfile,
+    # so I'm using os.walk() to loop over each file, and create a relative pathname which is used as arcname
+    tar = tarfile.open('acsi-package.tar.gz', 'w:gz')
+
+    for root, dirs, files in os.walk(tempdir):
+        for filename in files:
+            rel_path = path.relpath(path.join(root, filename), tempdir)
+            tar.add(path.join(tempdir, rel_path), arcname=rel_path)
+
+    tar.close()
+    shutil.rmtree(tempdir)
 
     print('We\'re done here. Press Enter or close this window.')
     input()
