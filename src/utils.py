@@ -44,7 +44,7 @@ def get_steamapps_dir():
     try:
         try:
             key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, path64)
-        except:
+        except FileNotFoundError:
             key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, path32)
 
         steamapps = path.join(winreg.QueryValueEx(key, 'InstallPath')[0], 'steamapps')
@@ -52,7 +52,7 @@ def get_steamapps_dir():
             return steamapps
         else:
             raise NotADirectoryError('Steam installation registry entry found, but steamapps is empty.')
-    except:
+    except FileNotFoundError:
         raise RuntimeError('Steam installation not found!')
 
 
@@ -62,15 +62,15 @@ def get_install_dir():
 
     # steam keeps track of multiple libraries via this file
     fp = open(path.join(steamapps[0], 'libraryfolders.vdf'))
-    librarydict = vdf.load(fp)
+    library_dict = vdf.load(fp)
 
     # and numbers the libraries from 1 to however many libraries the user has.
     # here we assume that no sane person has more than 16 steam libraries.
     for i in range(1, 16):
         try:
-            f = librarydict['LibraryFolders'][str(i)]
+            f = library_dict['LibraryFolders'][str(i)]
             steamapps.append(path.join(f, 'steamapps'))
-        except:
+        except KeyError:
             break
 
     # next we loop over every library, and check if there's an appmanifest for assetto corsa.
