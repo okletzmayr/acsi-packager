@@ -7,7 +7,7 @@ from os import path
 
 from src import utils
 
-logFormatter = logging.Formatter('%(levelname)-5s - %(message)s')
+logFormatter = logging.Formatter('%(message)s')
 consoleHandler = logging.StreamHandler()
 consoleHandler.setFormatter(logFormatter)
 logger = logging.getLogger()
@@ -27,8 +27,9 @@ def main():
 
     # more verbose and file output when --debug flag is set
     if args.debug:
+        fileFormatter = logging.Formatter('%(asctime)s - %(levelname)-5s - %(message)s')
         fileHandler = logging.FileHandler(path.join(basedir, 'acsi-packager.log'), mode='w')
-        fileHandler.setFormatter(logFormatter)
+        fileHandler.setFormatter(fileFormatter)
         logger.addHandler(fileHandler)
         logger.setLevel(logging.DEBUG)
 
@@ -54,6 +55,9 @@ def main():
     # and store them as a JSON.
     with open(path.join(tempdir, 'content.json'), 'w') as fp:
         json.dump(data, fp)
+
+    # scan binary files (graphics, car data, etc.) and copy them to be gzipped later
+    utils.scan_binary_files(ac_install_dir, tempdir)
 
     # finally, gzip the tempdir and output the gzipped file to the basedir
     utils.gzip_tempdir(tempdir, basedir)

@@ -3,7 +3,7 @@ import logging
 import shutil
 import tarfile
 import winreg
-from os import listdir, path, walk
+from os import listdir, makedirs, path, walk
 
 import vdf
 
@@ -38,8 +38,8 @@ def fix_track_length(orig_length):
 
 
 def get_steamapps_dir():
-    path64 = r"SOFTWARE\WOW6432Node\Valve\Steam"
-    path32 = r"SOFTWARE\Valve\Steam"
+    path64 = r'SOFTWARE\WOW6432Node\Valve\Steam'
+    path32 = r'SOFTWARE\Valve\Steam'
 
     try:
         try:
@@ -47,7 +47,7 @@ def get_steamapps_dir():
         except:
             key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, path32)
 
-        steamapps = path.join(winreg.QueryValueEx(key, 'InstallPath')[0], "steamapps")
+        steamapps = path.join(winreg.QueryValueEx(key, 'InstallPath')[0], 'steamapps')
         if path.isdir(steamapps):
             return steamapps
         else:
@@ -61,15 +61,15 @@ def get_install_dir():
     steamapps = [get_steamapps_dir()]
 
     # steam keeps track of multiple libraries via this file
-    fp = open(path.join(steamapps[0], "libraryfolders.vdf"))
+    fp = open(path.join(steamapps[0], 'libraryfolders.vdf'))
     librarydict = vdf.load(fp)
 
     # and numbers the libraries from 1 to however many libraries the user has.
     # here we assume that no sane person has more than 16 steam libraries.
     for i in range(1, 16):
         try:
-            f = librarydict["LibraryFolders"][str(i)]
-            steamapps.append(path.join(f, "steamapps"))
+            f = librarydict['LibraryFolders'][str(i)]
+            steamapps.append(path.join(f, 'steamapps'))
         except:
             break
 
@@ -148,6 +148,7 @@ def gzip_tempdir(tempdir, outputdir):
     # this is a mess, so I better write this comment right now:
     # tarfile.add() needs the arcname parameter if we don't want the full path structure in the tarfile,
     # so I'm using os.walk() to loop over each file, and create a relative pathname which is used as arcname
+    logger.info('Starting gzipping process. This could take a while, depending on amount of installed content.')
     tar = tarfile.open(path.join(outputdir, 'acsi-package.tar.gz'), 'w:gz')
 
     for root, dirs, files in walk(tempdir):
@@ -157,3 +158,31 @@ def gzip_tempdir(tempdir, outputdir):
 
     tar.close()
     shutil.rmtree(tempdir)
+
+
+def scan_binary_files(ac_install_dir, dest):
+    logger.info('Started copying binary files')
+    cars_dir = path.join(ac_install_dir, 'content', 'cars')
+    tracks_dir = path.join(ac_install_dir, 'content', 'tracks')
+
+    for root, dirs, files in walk(cars_dir):
+        for filename in files:
+            full_path = path.join(root, filename)
+            rel_path = path.relpath(full_path, cars_dir)
+            dest_path = path.join(dest, 'cars', rel_path)
+
+            if filename == 'data.acd':
+                makedirs(path.dirname(dest_path), exist_ok=True)
+                shutil.copy(full_path, dest_path)
+
+    for root, dirs, files in walk(tracks_dir):
+        for filename in files:
+            full_path = path.join(root, filename)
+            rel_path = path.relpath(full_path, tracks_dir)
+            dest_path = path.join(dest, 'tracks', rel_path)
+
+            if filename in ['surfaces.ini', 'preview.png', 'map.png']:
+                makedirs(path.dirname(dest_path), exist_ok=True)
+                shutil.copy(full_path, dest_path)
+
+    return 0
