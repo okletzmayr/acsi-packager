@@ -1,10 +1,8 @@
 import argparse
 import json
 import logging
-import os
-import shutil
 import sys
-import tarfile
+import tempfile
 from os import path
 
 from src import utils
@@ -23,9 +21,13 @@ args = parser.parse_args()
 
 
 def main():
+    # temporary dir to store the JSON data and car/track preview images
+    tempdir = tempfile.mkdtemp(prefix='acsi-packager-')
+    basedir = path.dirname(sys.argv[0])
+
     # more verbose and file output when --debug flag is set
     if args.debug:
-        fileHandler = logging.FileHandler('acsi-packager.log', mode='w')
+        fileHandler = logging.FileHandler(path.join(basedir, 'acsi-packager.log'), mode='w')
         fileHandler.setFormatter(logFormatter)
         logger.addHandler(fileHandler)
         logger.setLevel(logging.DEBUG)
@@ -40,30 +42,21 @@ def main():
         ac_install_dir = utils.get_install_dir()
         logger.info('Detected installation: %s', ac_install_dir)
 
+    # however we got the path, let's check if it exists and check for AssettoCorsa.exe
     if not path.isdir(ac_install_dir) or not path.isfile(path.join(ac_install_dir, 'AssettoCorsa.exe')):
         sys.exit('Assetto Corsa installation not found!')
 
-    # temporary dir to store the JSON data and car/track preview images
-    tempdir = path.join(path.dirname(__file__), 'package')
-    if not path.isdir(tempdir):
-        os.mkdir(tempdir)
+    logging.info('using tempdir: %s', tempdir)
 
+    # first, collect metadata about installed cars...
+    data = utils.scan_ui_files(ac_install_dir)
+
+    # and store them as a JSON.
     with open(path.join(tempdir, 'content.json'), 'w') as fp:
-        data = utils.scan_ui_files(ac_install_dir)
         json.dump(data, fp)
 
-    # this is a mess, so I better write this comment right now:
-    # tarfile.add() needs the arcname parameter if we don't want the full path structure in the tarfile,
-    # so I'm using os.walk() to loop over each file, and create a relative pathname which is used as arcname
-    tar = tarfile.open('acsi-package.tar.gz', 'w:gz')
-
-    for root, dirs, files in os.walk(tempdir):
-        for filename in files:
-            rel_path = path.relpath(path.join(root, filename), tempdir)
-            tar.add(path.join(tempdir, rel_path), arcname=rel_path)
-
-    tar.close()
-    shutil.rmtree(tempdir)
+    # finally, gzip the tempdir and output the gzipped file to the basedir
+    utils.gzip_tempdir(tempdir, basedir)
 
     return 0
 

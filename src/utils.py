@@ -1,7 +1,9 @@
 import json
 import logging
+import shutil
+import tarfile
 import winreg
-from os import listdir, path
+from os import listdir, path, walk
 
 import vdf
 
@@ -140,3 +142,18 @@ def scan_ui_files(ac_install_dir):
 
     logger.info('Found and parsed data of %d cars and %d tracks.', len(data['cars']), len(data['tracks']))
     return data
+
+
+def gzip_tempdir(tempdir, outputdir):
+    # this is a mess, so I better write this comment right now:
+    # tarfile.add() needs the arcname parameter if we don't want the full path structure in the tarfile,
+    # so I'm using os.walk() to loop over each file, and create a relative pathname which is used as arcname
+    tar = tarfile.open(path.join(outputdir, 'acsi-package.tar.gz'), 'w:gz')
+
+    for root, dirs, files in walk(tempdir):
+        for filename in files:
+            rel_path = path.relpath(path.join(root, filename), tempdir)
+            tar.add(path.join(tempdir, rel_path), arcname=rel_path)
+
+    tar.close()
+    shutil.rmtree(tempdir)
