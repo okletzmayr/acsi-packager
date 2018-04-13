@@ -1,6 +1,6 @@
 import argparse
-import json
 import logging
+import shutil
 import sys
 import tempfile
 from os import path
@@ -49,20 +49,23 @@ def main():
 
     logging.info('using tempdir: %s', tempdir)
 
-    # first, collect metadata about installed cars...
-    data = utils.scan_ui_files(ac_install_dir)
+    # even if something crashes, clean up the tempdir afterwards
+    try:
+        # first, collect metadata about installed cars
+        utils.scan_ui_files(ac_install_dir, tempdir)
 
-    # and store them as a JSON.
-    with open(path.join(tempdir, 'content.json'), 'w') as fp:
-        json.dump(data, fp)
+        # scan binary files (graphics, car data, etc.) and copy them to be gzipped later
+        utils.scan_binary_files(ac_install_dir, tempdir)
 
-    # scan binary files (graphics, car data, etc.) and copy them to be gzipped later
-    utils.scan_binary_files(ac_install_dir, tempdir)
+        # finally, gzip the tempdir and output the gzipped file to the basedir
+        utils.gzip_tempdir(tempdir, basedir)
 
-    # finally, gzip the tempdir and output the gzipped file to the basedir
-    utils.gzip_tempdir(tempdir, basedir)
-
-    return 0
+        logging.info('Done. Press Enter or simply close this window.')
+        input()
+    except Exception as e:
+        logging.error('Error: %s', str(e))
+    finally:
+        shutil.rmtree(tempdir)
 
 
 if __name__ == '__main__':

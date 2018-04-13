@@ -100,23 +100,28 @@ def read_ui_file(fp):
     return info
 
 
-def scan_ui_files(ac_install_dir):
+def scan_ui_files(ac_install_dir, output_dir):
     cars_dir = path.join(ac_install_dir, 'content', 'cars')
     tracks_dir = path.join(ac_install_dir, 'content', 'tracks')
     data = {'cars': {},
             'tracks': {}}
 
-    logger.debug('Scanning for cars')
     # scan every car in AC/content/cars
+    logger.debug('Scanning for cars')
     for car in listdir(cars_dir):
         fp = path.join(path.join(cars_dir, car, 'ui', 'ui_car.json'))
         info = read_ui_file(fp)
+        brand = info['brand']
 
-        data['cars'][car] = {'ui_name': info['name']}
+        if brand not in data['cars']:
+            data['cars'][brand] = {}
+
+        data['cars'][brand][car] = {'name': info['name']}
+
         logger.debug('car: "{}" ({})'.format(info['name'], car))
 
-    logger.debug('Scanning for tracks')
     # scan every track in AC/content/tracks
+    logger.debug('Scanning for tracks')
     for track in listdir(tracks_dir):
         fp = path.join(path.join(tracks_dir, track, 'ui', 'ui_track.json'))
 
@@ -124,40 +129,59 @@ def scan_ui_files(ac_install_dir):
         if path.exists(fp):
             info = read_ui_file(fp)
             tl = fix_track_length(info['length'])
-            data['tracks'][track] = {'ui_name': info['name'], 'length': tl}
+            data['tracks'][track] = {'name': info['name'], 'length': tl}
             logger.debug('track: "%s" (%s) - %dm', info['name'], track, tl)
 
         # if there are more, we have to scan each layout
         else:
             data['tracks'][track] = {'layouts': {}}
 
-            for track_config in listdir(path.join(tracks_dir, track, 'ui')):
-                if path.isdir(path.join(tracks_dir, track, 'ui', track_config)):
-                    fp = path.join(tracks_dir, track, 'ui', track_config, 'ui_track.json')
+            for layout in listdir(path.join(tracks_dir, track, 'ui')):
+                # only scan directories, ignore clutter like Thumbs.db
+                # if path.isdir(path.join(tracks_dir, track, 'ui', layout)):
+                fp = path.join(tracks_dir, track, 'ui', layout, 'ui_track.json')
+
+                if path.isfile(fp):
                     info = read_ui_file(fp)
-                    tp = track + '/' + track_config
                     tl = fix_track_length(info['length'])
-                    data['tracks'][track]['layouts'][track_config] = {'ui_name': info['name'], 'length': tl}
-                    logger.debug('track: "%s" (%s) - %dm', info['name'], tp, tl)
+                    data['tracks'][track]['layouts'][layout] = {'name': info['name'], 'length': tl}
+                    logger.debug('track: "%s" (%s/%s) - %dm', info['name'], track, layout, tl)
 
-    logger.info('Found and parsed data of %d cars and %d tracks.', len(data['cars']), len(data['tracks']))
-    return data
+    car_count = 0
+    for brand in data['cars']:
+        car_count += len(brand)
+
+    logger.info('Parsed data of %d cars by %s brands and %d tracks.',
+                car_count, len(data['cars']), len(data['tracks']))
+
+    with open(path.join(output_dir, 'content.json'), 'w') as fp:
+        json.dump(data, fp)
 
 
-def gzip_tempdir(tempdir, outputdir):
+def gzip_tempdir(tempdir, output_dir):
     # this is a mess, so I better write this comment right now:
     # tarfile.add() needs the arcname parameter if we don't want the full path structure in the tarfile,
     # so I'm using os.walk() to loop over each file, and create a relative pathname which is used as arcname
     logger.info('Starting gzipping process. This could take a while, depending on amount of installed content.')
-    tar = tarfile.open(path.join(outputdir, 'acsi-package.tar.gz'), 'w:gz')
+    fp = path.join(output_dir, 'acsi-package.tar.gz')
+    tar = tarfile.open(fp, 'w:gz')
+
+    # keep track of compression ratio
+    size_prezip = 0
 
     for root, dirs, files in walk(tempdir):
         for filename in files:
-            rel_path = path.relpath(path.join(root, filename), tempdir)
+            full_path = path.join(root, filename)
+            rel_path = path.relpath(full_path, tempdir)
+
+            size_prezip += path.getsize(full_path)
+
             tar.add(path.join(tempdir, rel_path), arcname=rel_path)
 
     tar.close()
-    shutil.rmtree(tempdir)
+    size_postzip = path.getsize(fp)
+    logger.info('Compressed %.1f MB of data to %.1f MB. (ratio: %.1f%%)',
+                size_prezip / pow(1024, 2), size_postzip / pow(1024, 2), (size_postzip / size_prezip) * 100)
 
 
 def scan_binary_files(ac_install_dir, dest):
@@ -184,5 +208,3 @@ def scan_binary_files(ac_install_dir, dest):
             if filename in ['surfaces.ini', 'preview.png', 'map.png']:
                 makedirs(path.dirname(dest_path), exist_ok=True)
                 shutil.copy(full_path, dest_path)
-
-    return 0
