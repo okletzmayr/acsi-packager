@@ -41,19 +41,24 @@ def get_steamapps_dir():
     path64 = r'SOFTWARE\WOW6432Node\Valve\Steam'
     path32 = r'SOFTWARE\Valve\Steam'
 
+    logging.debug('Searching for steampath')
+
     try:
         try:
+            logging.debug('Trying registry key %s', path64)
             key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, path64)
         except FileNotFoundError:
+            logging.debug('Trying fallback registry key %s', path32)
             key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, path32)
 
         steamapps = path.join(winreg.QueryValueEx(key, 'InstallPath')[0], 'steamapps')
         if path.isdir(steamapps):
+            logging.debug('Found steamapps folder: %s', steamapps)
             return steamapps
         else:
-            raise NotADirectoryError('Steam installation registry entry found, but steamapps is empty.')
+            raise Exception('Steam installation registry entry found, but steamapps is empty')
     except FileNotFoundError:
-        raise RuntimeError('Steam installation not found!')
+        raise Exception('Steam installation not found')
 
 
 def get_install_dir():
@@ -61,8 +66,9 @@ def get_install_dir():
     steamapps = [get_steamapps_dir()]
 
     # steam keeps track of multiple libraries via this file
-    fp = open(path.join(steamapps[0], 'libraryfolders.vdf'))
-    library_dict = vdf.load(fp)
+    fp = path.join(steamapps[0], 'libraryfolders.vdf')
+    logging.debug('Reading %s', fp)
+    library_dict = vdf.load(open(fp))
 
     # and numbers the libraries from 1 to however many libraries the user has.
     # here we assume that no sane person has more than 16 steam libraries.
@@ -70,14 +76,19 @@ def get_install_dir():
         try:
             f = library_dict['LibraryFolders'][str(i)]
             steamapps.append(path.join(f, 'steamapps'))
+            logging.debug('Detected library folder %s', f)
         except KeyError:
+            logging.debug('Detected %d libraries.', i - 1)
             break
 
     # next we loop over every library, and check if there's an appmanifest for assetto corsa.
+    logging.debug('Searching for the appmanifest')
     for library in steamapps:
         if 'appmanifest_244210.acf' in listdir(library):
+            logging.debug('AC detected in library: %s', library)
             return path.join(library, 'common', 'assettocorsa')
         else:
+            logging.debug('AC not detected in library: %s', library)
             return None
 
 
@@ -185,7 +196,7 @@ def gzip_tempdir(tempdir, output_dir):
 
 
 def scan_binary_files(ac_install_dir, dest):
-    logger.info('Started copying binary files')
+    logger.info('Starting to copy binary files')
     cars_dir = path.join(ac_install_dir, 'content', 'cars')
     tracks_dir = path.join(ac_install_dir, 'content', 'tracks')
 
@@ -208,3 +219,5 @@ def scan_binary_files(ac_install_dir, dest):
             if filename in ['surfaces.ini', 'preview.png', 'map.png']:
                 makedirs(path.dirname(dest_path), exist_ok=True)
                 shutil.copy(full_path, dest_path)
+
+    logger.debug('Finished copying binary files.')

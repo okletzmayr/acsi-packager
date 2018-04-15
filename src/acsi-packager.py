@@ -9,45 +9,35 @@ from src import utils
 
 
 def main():
-    # even if something crashes, clean up the tempdir afterwards
-    try:
-        # attempt to the path via the get_install_dir function if not supplied manually
-        ac_install_dir = args.installdir if args.installdir else utils.get_install_dir()
-        logger.info('Using AC installation path: %s', ac_install_dir)
+    # attempt to the path via the get_install_dir function if not supplied manually
+    ac_install_dir = args.installdir if args.installdir else utils.get_install_dir()
+    logger.info('Using AC installation path: %s', ac_install_dir)
 
-        # let's check if ac_install_dir exists and check for AssettoCorsa.exe
-        if not (path.isdir(ac_install_dir) and path.isfile(path.join(ac_install_dir, 'AssettoCorsa.exe'))):
-            raise RuntimeError('Assetto Corsa installation not found!')
+    # let's check if ac_install_dir exists and check for AssettoCorsa.exe
+    if not (path.isdir(ac_install_dir) and path.isfile(path.join(ac_install_dir, 'AssettoCorsa.exe'))):
+        raise RuntimeError('Assetto Corsa installation not found!')
 
-        # collect metadata about installed cars
-        utils.scan_ui_files(ac_install_dir, tempdir)
+    # collect metadata about installed cars
+    utils.scan_ui_files(ac_install_dir, tempdir)
 
-        # scan binary files (graphics, car data, etc.) and copy them to be gzipped later
-        utils.scan_binary_files(ac_install_dir, tempdir)
+    # scan binary files (graphics, car data, etc.) and copy them to be gzipped later
+    utils.scan_binary_files(ac_install_dir, tempdir)
 
-        # finally, gzip the tempdir and output the gzipped file to the basedir
-        utils.gzip_tempdir(tempdir, basedir)
+    # finally, gzip the tempdir and output the gzipped file to the basedir
+    utils.gzip_tempdir(tempdir, basedir)
 
-        # leave the window open to show the user what happened
-        logging.info('Done. Press Enter or simply close this window.')
-
-        # remove logfile if everything went smooth
+    # remove logfile if everything went smooth
+    if not args.debug:
         try:
             f_handler.close()
             remove(logfile)
         except OSError:
             logging.error('Removal of \'acsi-packager.log\' failed. You might want to delete it manually.')
 
-        input()
+    # leave the window open to show the user what happened
+    logging.info('Done. Press Enter or simply close this window.')
 
-    except Exception as e:
-        logging.error('%s', str(e))
-        logging.info('Please report this bug and include the \'acsi-packager.log\' file. Thank you.')
-        logging.info('Press Enter or simply close this window.')
-        input()
-
-    finally:
-        shutil.rmtree(tempdir)
+    input()
 
 
 if __name__ == '__main__':
@@ -63,7 +53,7 @@ if __name__ == '__main__':
 
     # file handler logs at DEBUG level
     logfile = path.join(basedir, 'acsi-packager.log')
-    f_formatter = logging.Formatter('%(asctime)s - %(levelname)-5s - %(message)s')
+    f_formatter = logging.Formatter('%(relativeCreated)05d; %(funcName)s; %(levelname)s; %(message)s')
     f_handler = logging.FileHandler(logfile, mode='w')
     f_handler.setFormatter(f_formatter)
     f_handler.setLevel(logging.DEBUG)
@@ -80,6 +70,17 @@ if __name__ == '__main__':
     parser.add_argument('--debug', help='keep log debug output', action='store_true')
     args = parser.parse_args()
 
-    logging.info('using tempdir: %s', tempdir)
+    logging.debug('Using tempdir: %s', tempdir)
 
-    main()
+    # whatever happens, remove the tempdir afterwards
+    try:
+        main()
+
+    except Exception as e:
+        logging.error('%s', str(e))
+        logging.info('Please report this bug and include the \'acsi-packager.log\' file. Thank you.')
+        logging.info('Press Enter or simply close this window.')
+        input()
+
+    finally:
+        shutil.rmtree(tempdir)
