@@ -1,0 +1,28 @@
+version: '{build}'
+branches:
+  only:
+    - master
+shallow_clone: true
+
+init:
+- ps: $env:path="C:\Python36;$env:path"
+
+install:
+- cmd: python -m pip install -r requirements.txt
+
+build_script:
+- cmd: python make.py
+
+test: off
+
+artifacts:
+- path: dist\acsi-packager.exe
+
+deploy:
+- provider: GitHub
+  auth_token:
+    secure: ZjFpOXV0BLT+Wn8Ar+oIDA+5YSMcAmas0VjwWKho/yRlP/yHwegofJmFgdlZYk/3
+  artifact: dist\acsi-packager.exe
+  on:
+    branch: master
+    appveyor_repo_tag: true
