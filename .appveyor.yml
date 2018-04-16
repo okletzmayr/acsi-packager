@@ -17,6 +17,7 @@ test: off
 
 artifacts:
 - path: dist\acsi-packager.exe
+  name: acsi-packager
 
 deploy:
 - provider: GitHub
