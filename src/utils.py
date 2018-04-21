@@ -120,23 +120,35 @@ def scan_ui_files(ac_install_dir, output_dir):
     # scan every car in AC/content/cars
     logger.debug('Scanning for cars')
     for car in listdir(cars_dir):
-        fp = path.join(path.join(cars_dir, car, 'ui', 'ui_car.json'))
-        info = read_ui_file(fp)
-        brand = info['brand']
+        fp = path.join(cars_dir, car, 'ui', 'ui_car.json')
 
-        if brand not in data['cars']:
-            data['cars'][brand] = {}
+        # if a user doesn't have DLC the car is included in, read the alternative file
+        if not path.isfile(fp):
+            fp = path.join(cars_dir, car, 'ui', 'dlc_ui_car.json')
 
-        data['cars'][brand][car] = {'name': info['name']}
+        try:
+            info = read_ui_file(fp)
+            brand = info['brand']
 
-        logger.debug('car: "{}" ({})'.format(info['name'], car))
+            if brand not in data['cars']:
+                data['cars'][brand] = {}
+
+            data['cars'][brand][car] = {'name': info['name']}
+
+            logger.debug('car: "%s" (%s)', info['name'], car)
+        except:
+            logger.info('car: could not parse info for %s', car)
 
     # scan every track in AC/content/tracks
     logger.debug('Scanning for tracks')
     for track in listdir(tracks_dir):
         fp = path.join(path.join(tracks_dir, track, 'ui', 'ui_track.json'))
 
-        # if there's a toplevel ui_track.json, it's a single-layout track
+        # same as with DLC cars, first fallback to dlc_ui_track
+        if not path.isfile(fp):
+            fp = path.join(cars_dir, car, 'ui', 'dlc_ui_track.json')
+
+        # if there's a top-level ui_track or dlc_ui_track, it's a single-layout track
         if path.exists(fp):
             info = read_ui_file(fp)
             tl = fix_track_length(info['length'])
@@ -151,6 +163,10 @@ def scan_ui_files(ac_install_dir, output_dir):
                 # only scan directories, ignore clutter like Thumbs.db
                 # if path.isdir(path.join(tracks_dir, track, 'ui', layout)):
                 fp = path.join(tracks_dir, track, 'ui', layout, 'ui_track.json')
+
+                # once more, fallback to dlc_ui_track
+                if not path.isfile(fp):
+                    fp = path.join(cars_dir, car, 'ui', 'dlc_ui_track.json')
 
                 if path.isfile(fp):
                     info = read_ui_file(fp)
